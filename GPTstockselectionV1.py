@@ -1,22 +1,18 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import requests
-import urllib3
-from FinMind.data import DataLoader
 import datetime
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+from FinMind.data import DataLoader
 
 st.set_page_config(page_title="台股飆股雷達 V2", layout="wide")
 
-st.title("🚀 台股飆股雷達 V2 (高速版)")
+st.title("🚀 台股飆股雷達 V2")
 
-# ----------------------------
-# 側邊欄設定
-# ----------------------------
+# ------------------------
+# 側邊欄
+# ------------------------
 
-st.sidebar.header("策略參數")
+st.sidebar.header("策略設定")
 
 capital = st.sidebar.number_input(
     "總投資資金",
@@ -37,56 +33,51 @@ revenue_threshold = st.sidebar.slider(
     20
 )
 
-min_trade_value = st.sidebar.number_input(
-    "最低成交金額 (TWD)",
-    value=30000000
-)
-
-# ----------------------------
-# FinMind 初始化
-# ----------------------------
+# ------------------------
+# FinMind
+# ------------------------
 
 dl = DataLoader()
 
-# ----------------------------
-# 抓股價資料
-# ----------------------------
+# ------------------------
+# 股價資料
+# ------------------------
 
 @st.cache_data
 def get_price_data():
 
     today = datetime.date.today()
-
     start = today - datetime.timedelta(days=400)
 
-    df = dl.taiwan_stock_price(
+    df = dl.dataset(
+        dataset="TaiwanStockPrice",
         start_date=start.strftime("%Y-%m-%d")
     )
 
     return df
 
 
-# ----------------------------
-# 抓月營收
-# ----------------------------
+# ------------------------
+# 營收資料
+# ------------------------
 
 @st.cache_data
 def get_revenue_data():
 
     today = datetime.date.today()
-
     start = today - datetime.timedelta(days=800)
 
-    df = dl.taiwan_stock_month_revenue(
+    df = dl.dataset(
+        dataset="TaiwanStockMonthRevenue",
         start_date=start.strftime("%Y-%m-%d")
     )
 
     return df
 
 
-# ----------------------------
-# 計算營收YoY
-# ----------------------------
+# ------------------------
+# 營收YoY
+# ------------------------
 
 def compute_revenue_yoy(df):
 
@@ -103,16 +94,13 @@ def compute_revenue_yoy(df):
     return latest[["stock_id", "yoy"]]
 
 
-# ----------------------------
-# 技術面分析
-# ----------------------------
+# ------------------------
+# 技術分析
+# ------------------------
 
 def compute_technical(df):
 
     df = df.sort_values(["stock_id", "date"])
-
-    df["close"] = pd.to_numeric(df["close"])
-    df["Trading_Volume"] = pd.to_numeric(df["Trading_Volume"])
 
     result = []
 
@@ -156,11 +144,11 @@ def compute_technical(df):
     return pd.DataFrame(result)
 
 
-# ----------------------------
-# 主掃描流程
-# ----------------------------
+# ------------------------
+# 主程式
+# ------------------------
 
-if st.button("🚀 開始掃描全市場"):
+if st.button("🚀 開始掃描"):
 
     with st.spinner("抓取股價資料..."):
         price_df = get_price_data()
@@ -168,17 +156,15 @@ if st.button("🚀 開始掃描全市場"):
     with st.spinner("抓取營收資料..."):
         revenue_df = get_revenue_data()
 
-    st.write("資料載入完成")
-
-    with st.spinner("計算技術指標..."):
+    with st.spinner("計算技術分析..."):
         tech_df = compute_technical(price_df)
 
     with st.spinner("計算營收YoY..."):
-        rev_yoy_df = compute_revenue_yoy(revenue_df)
+        rev_df = compute_revenue_yoy(revenue_df)
 
     df = pd.merge(
         tech_df,
-        rev_yoy_df,
+        rev_df,
         on="stock_id",
         how="left"
     )
@@ -224,7 +210,7 @@ if st.button("🚀 開始掃描全市場"):
         "rev_reason": "基本面"
     })
 
-    st.success(f"找到 {len(display)} 檔潛力飆股")
+    st.success(f"找到 {len(display)} 檔潛力股")
 
     st.dataframe(
         display.head(30),
@@ -234,9 +220,9 @@ if st.button("🚀 開始掃描全市場"):
     csv = display.to_csv(index=False).encode("utf-8-sig")
 
     st.download_button(
-        "下載 CSV",
+        "下載CSV",
         csv,
-        "taiwan_stock_radar_v2.csv",
+        "taiwan_stock_radar.csv",
         "text/csv"
     )
 
